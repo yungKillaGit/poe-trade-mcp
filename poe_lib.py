@@ -18,6 +18,7 @@ Env vars (set in .mcp.json):
 """
 import json
 import os
+import sys
 import time
 import urllib.parse
 import urllib.request
@@ -29,6 +30,11 @@ _HEADERS = {
     "Accept": "application/json",
 }
 _REQUEST_DELAY = 1.5  # minimum seconds between API calls (PoE rate limit)
+# POE_MIN_REQUEST_INTERVAL can raise — never lower — the floor above.
+try:
+    _REQUEST_DELAY = max(1.0, float(os.environ.get("POE_MIN_REQUEST_INTERVAL", _REQUEST_DELAY)))
+except (TypeError, ValueError):
+    pass
 _TIMEOUT = 30
 
 
@@ -89,6 +95,12 @@ class PoeApi:
         self.client_id = client_id
         contact = f"; contact: {contact_email}" if contact_email else ""
         self.user_agent = f"poe-trade-mcp/1.0 (account: {self.account}{contact})"
+        if not contact_email:
+            print(
+                "[poe-trade] WARNING: POE_CONTACT_EMAIL is not set. GGG's API policy "
+                "requires a real contact address in the User-Agent — add it to .mcp.json.",
+                file=sys.stderr,
+            )
 
     def _rate_limit(self):
         elapsed = time.monotonic() - PoeApi._last_request_time

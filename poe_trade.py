@@ -20,11 +20,40 @@ from mcp.server.stdio import stdio_server
 from mcp.types import TextContent, Tool
 
 TRADE_BASE = "https://www.pathofexile.com/api/trade"
+VERSION = "1.0"
+# The User-Agent is built per request in _user_agent() — GGG's API policy wants
+# an identifiable client plus a real contact address, and we only know those at
+# request time (env vars / config.json). See legal_considerations.md.
 HEADERS = {
     "Content-Type": "application/json",
-    "User-Agent": "OAuth BoschAIMaster/1.0 (contact: buildtool@localhost)",
     "Accept": "application/json",
 }
+
+_CONTACT_WARNED = False
+
+
+def _user_agent(account: str = "", contact: str = "") -> str:
+    """Build the User-Agent that GGG's API policy expects.
+
+    Policy requires an identifiable client and a real contact address so GGG
+    can reach a human before throttling or blocking. A placeholder contact
+    (historically `contact: buildtool@localhost`) counts as no contact at all.
+    """
+    global _CONTACT_WARNED
+    parts = []
+    if account:
+        parts.append("account: " + account)
+    if contact:
+        parts.append("contact: " + contact)
+    elif not _CONTACT_WARNED:
+        _CONTACT_WARNED = True
+        print(
+            "[poe-trade] WARNING: POE_CONTACT_EMAIL is not set. GGG's API policy "
+            "requires a real contact address in the User-Agent — add it to .mcp.json.",
+            file=sys.stderr,
+        )
+    suffix = " (" + "; ".join(parts) + ")" if parts else ""
+    return "poe-trade-mcp/" + VERSION + suffix
 
 # Default league — overridden by tool argument
 DEFAULT_LEAGUE = "Mirage"
@@ -32,8 +61,18 @@ DEFAULT_LEAGUE = "Mirage"
 # GGG trade API rate limiting — see legal_considerations.md TOS section.
 # Floor: 1.5s between requests. Dynamically widened from X-Rate-Limit response
 # headers so we stay inside GGG's observed per-policy windows.
+# POE_MIN_REQUEST_INTERVAL raises the floor (never lowers it below 1.0s) for
+# users who want extra headroom.
+def _env_float(name: str, default: float, hard_floor: float) -> float:
+    try:
+        value = float(os.environ.get(name, default))
+    except (TypeError, ValueError):
+        return default
+    return max(hard_floor, value)
+
+
 _last_trade_request_time: float = 0.0
-_TRADE_MIN_INTERVAL = 1.5        # hard floor (seconds)
+_TRADE_MIN_INTERVAL = _env_float("POE_MIN_REQUEST_INTERVAL", 1.5, 1.0)  # hard floor
 _observed_min_interval: float = _TRADE_MIN_INTERVAL  # updated from headers
 
 NON_AFFILIATION_NOTICE = (
@@ -80,23 +119,43 @@ def _rate_limit_trade():
     _last_trade_request_time = time.time()
 
 
-def _load_headers():
-    """Return request headers, adding POESESSID cookie from config if available."""
-    h = dict(HEADERS)
-    config_paths = [
+def _load_headers() -> dict:
+    """Return request headers, merging env vars with local config.json.
+
+    Credential sources, in order of precedence:
+      1. POE_SESSION_ID / POE_ACCOUNT_NAME / POE_CONTACT_EMAIL (.mcp.json env)
+      2. poe-trade-mcp/config.json            (gitignored, stays on this machine)
+      3. POE_CONFIG_PATH, then the legacy buildstuff/poe_monitor/config.json
+
+    The User-Agent is built from whatever account/contact we resolved, so GGG
+    can identify the client without the hardcoded placeholder that used to be
+    here.
+    """
+    cfg: dict = {}
+    candidates = [
+        Path(__file__).parent / "config.json",
         Path(os.environ["POE_CONFIG_PATH"]) if "POE_CONFIG_PATH" in os.environ else None,
         Path(__file__).parent.parent / "buildstuff" / "poe_monitor" / "config.json",
     ]
-    config_paths = [p for p in config_paths if p]
-    for p in config_paths:
+    for p in candidates:
+        if p is None:
+            continue
         try:
-            cfg = json.loads(p.read_text())
-            sessid = cfg.get("poesessid", "")
-            if sessid:
-                h["Cookie"] = "POESESSID=" + sessid
-                break
+            loaded = json.loads(p.read_text())
         except Exception:
-            pass
+            continue
+        if isinstance(loaded, dict):
+            for key, value in loaded.items():
+                cfg.setdefault(key, value)
+
+    sessid = os.environ.get("POE_SESSION_ID") or cfg.get("poesessid", "")
+    account = os.environ.get("POE_ACCOUNT_NAME") or cfg.get("account", "")
+    contact = os.environ.get("POE_CONTACT_EMAIL") or cfg.get("contact_email", "")
+
+    h = dict(HEADERS)
+    h["User-Agent"] = _user_agent(account, contact)
+    if sessid:
+        h["Cookie"] = "POESESSID=" + sessid
     return h
 
 
