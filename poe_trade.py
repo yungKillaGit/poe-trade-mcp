@@ -32,6 +32,18 @@ HEADERS = {
 _CONTACT_WARNED = False
 
 
+def _header_safe(value: str) -> str:
+    """Percent-encode non-ASCII so header values stay ISO-8859-1 friendly.
+
+    PoE account names may contain non-Latin characters, and urllib refuses to
+    send a header containing them (UnicodeEncodeError).
+    """
+    return "".join(
+        ch if 32 <= ord(ch) < 127 else urllib.parse.quote(ch, safe="")
+        for ch in value
+    )
+
+
 def _user_agent(account: str = "", contact: str = "", client_id: str = "") -> str:
     """Build the User-Agent mandated by GGG's developer guidelines.
 
@@ -50,7 +62,9 @@ def _user_agent(account: str = "", contact: str = "", client_id: str = "") -> st
             file=sys.stderr,
         )
     if client_id:
-        return "OAuth " + client_id + "/" + VERSION + " (contact: " + (contact or "unset") + ")"
+        return _header_safe(
+            "OAuth " + client_id + "/" + VERSION + " (contact: " + (contact or "unset") + ")"
+        )
 
     parts = []
     if account:
@@ -58,7 +72,7 @@ def _user_agent(account: str = "", contact: str = "", client_id: str = "") -> st
     if contact:
         parts.append("contact: " + contact)
     suffix = " (" + "; ".join(parts) + ")" if parts else ""
-    return "poe-trade-mcp/" + VERSION + suffix
+    return _header_safe("poe-trade-mcp/" + VERSION + suffix)
 
 # Default league — overridden by tool argument
 DEFAULT_LEAGUE = "Mirage"

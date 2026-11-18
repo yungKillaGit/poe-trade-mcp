@@ -38,6 +38,19 @@ except (TypeError, ValueError):
 _TIMEOUT = 30
 
 
+def _header_safe(value: str) -> str:
+    """Percent-encode non-ASCII so header values stay ISO-8859-1 friendly.
+
+    PoE account names may contain non-Latin characters, and urllib refuses to
+    send a header containing them (UnicodeEncodeError). Encoding them keeps the
+    User-Agent valid and still identifies the account.
+    """
+    return "".join(
+        ch if 32 <= ord(ch) < 127 else urllib.parse.quote(ch, safe="")
+        for ch in value
+    )
+
+
 def load_config() -> dict:
     """Load PoE credentials. Env vars take precedence over config.json."""
     cfg: dict = {}
@@ -109,6 +122,7 @@ class PoeApi:
                 "requires a real contact address in the User-Agent — add it to .mcp.json.",
                 file=sys.stderr,
             )
+        self.user_agent = _header_safe(self.user_agent)
 
     def _rate_limit(self):
         elapsed = time.monotonic() - PoeApi._last_request_time
