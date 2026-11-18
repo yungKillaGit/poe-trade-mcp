@@ -1,7 +1,8 @@
 """poe-trade-mcp MCP Server — single server that bundles all PoE MCP tools.
 
-Runs all poe-market, poe-stash, poe-trade, poe-char, poe-pricer, poe-filter,
-pob-vault, and pob-brain tools under one MCP connection.
+Runs all poe-market, poe-stash, poe-trade, poe-char, poe-pricer and poe-filter
+tools under one MCP connection. Path of Building tooling lives in the separate
+`pob-mcp` server.
 
 Usage:
     python poe_all.py          # stdio (add to .mcp.json as single entry)
@@ -38,8 +39,14 @@ _SERVERS = [
     ("poe_char",         "poe-char"),
     ("poe_pricer",       "poe-pricer"),
     ("poe_filter",       "poe-filter"),
-    ("pob_vault_mcp",    "pob-vault"),
 ]
+# Not registered here on purpose:
+#   pob_vault_mcp — was an external module from the author's machine, never
+#                   published. Build management is covered by the separate
+#                   pob-mcp server.
+#   server (pob-brain) — headless Path of Building, likewise external. pob-mcp
+#                   already exposes that over its own transport.
+# Registering them produced permanent "WARNING: could not load ..." noise.
 
 _tool_registry: dict[str, tuple] = {}  # tool_name -> (call_tool_handler, original_name)
 
@@ -70,19 +77,6 @@ def _load_servers():
 
         print(f"[poe-trade-mcp] loaded {len(tools)} tools from {module_name}", file=sys.stderr)
 
-    # pob-brain is special (has LuaProcess), load separately
-    try:
-        import server as pob_brain_mod
-        sub_app = pob_brain_mod.app
-        tools = pob_brain_mod.TOOLS
-        from mcp.types import CallToolRequest
-        handler = sub_app.request_handlers.get(CallToolRequest)
-        for tool in tools:
-            _tool_registry[tool.name] = (handler, tool.name, "pob-brain")
-        print(f"[poe-trade-mcp] loaded {len(tools)} tools from pob-brain", file=sys.stderr)
-    except Exception as e:
-        print(f"[poe-trade-mcp] WARNING: could not load pob-brain: {e}", file=sys.stderr)
-
 
 _load_servers()
 
@@ -104,12 +98,6 @@ def _collect_all_tools() -> list[Tool]:
                 tools_out.append(t)
         except Exception:
             pass
-    try:
-        import server as pob_brain_mod
-        for t in pob_brain_mod.TOOLS:
-            tools_out.append(t)
-    except Exception:
-        pass
     return tools_out
 
 
@@ -146,5 +134,5 @@ async def call_tool(name: str, arguments: dict):
 from mcp_server_utils import run_server
 
 if __name__ == "__main__":
-    print(f"[poe-trade-mcp] {len(_ALL_TOOLS)} tools loaded across {len(_SERVERS) + 1} servers", file=sys.stderr)
+    print(f"[poe-trade-mcp] {len(_ALL_TOOLS)} tools loaded across {len(_SERVERS)} servers", file=sys.stderr)
     run_server(combined, port=8490, name="poe-trade-mcp")

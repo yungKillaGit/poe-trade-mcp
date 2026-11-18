@@ -16,16 +16,14 @@ This server is part of [poe_mcp_suite](https://github.com/charleslucas/poe_mcp_s
 
 ## Architecture
 
-The repo contains 7 Python modules. Six are standalone MCP servers, each with their own `Server` instance, `TOOLS` list, and `call_tool` handler. The seventh, `poe_all.py`, acts as a **unified gateway** that dynamically imports all six sibling servers (plus the external `pob-vault` and `pob-brain` servers), collects their tool definitions, and re-registers everything onto a single combined MCP `Server`. This means you can either run individual servers on their own ports, or run `poe_all.py` once to get every tool under one MCP connection.
+The repo contains 9 Python modules. Six are standalone MCP servers, each with their own `Server` instance, `TOOLS` list, and `call_tool` handler. One (`poe_all.py`) acts as a **unified gateway** that dynamically imports all six sibling servers, collects their tool definitions, and re-registers everything onto a single combined MCP `Server`. Two more support the price database (`price_db.py`, `trend_watcher.py`). This means you can either run individual servers on their own ports, or run `poe_all.py` once to get every tool under one MCP connection.
 
 ### How poe_all.py bundles sub-servers
 
-1. Adds sibling directories (`c:/src/pobrain`, `c:/src/buildstuff`) to `sys.path`.
-2. Iterates a registry of `(module_name, prefix)` tuples and uses `importlib.import_module()` to load each.
-3. From each loaded module, reads the `TOOLS` list and extracts the `call_tool` request handler from the sub-server's `app.request_handlers`.
-4. Stores a mapping of `tool_name -> (handler, original_name, prefix)` in `_tool_registry`.
-5. The combined `@combined.call_tool()` handler dispatches incoming calls by constructing a synthetic `CallToolRequest` and forwarding it to the appropriate sub-server handler.
-6. `pob-brain` (from `c:/src/pobrain/server.py`) is loaded separately because it manages a LuaProcess for headless Path of Building.
+1. Iterates a registry of `(module_name, prefix)` tuples and uses `importlib.import_module()` to load each from this directory.
+2. From each loaded module, reads the `TOOLS` list and extracts the `call_tool` request handler from the sub-server's `app.request_handlers`.
+3. Stores a mapping of `tool_name -> (handler, original_name, prefix)` in `_tool_registry`.
+4. The combined `@combined.call_tool()` handler dispatches incoming calls by constructing a synthetic `CallToolRequest` and forwarding it to the appropriate sub-server handler.
 
 **Sub-server registry:**
 
@@ -37,9 +35,12 @@ The repo contains 7 Python modules. Six are standalone MCP servers, each with th
 | `poe_char` | poe-char | 8485 |
 | `poe_pricer` | poe-pricer | 8486 |
 | `poe_filter` | poe-filter | 8487 |
-| `pob_vault_mcp` | pob-vault | (external) |
-| `server` (pob-brain) | pob-brain | (external) |
 | **poe_all** | **poe-trade-mcp** | **8490** |
+
+> Path of Building tooling is **not** bundled here — use the separate `pob-mcp`
+> server. Earlier versions of this repo referenced two external modules
+> (`pob_vault_mcp`, and `server.py` for a "pob-brain"), which were never
+> published and produced permanent load warnings.
 
 ---
 
@@ -495,15 +496,25 @@ These modules live directly in this repo:
 
 | Module | Location | Purpose |
 |--------|----------|---------|
-| `price_db.py` | sibling of this repo | SQLite interface for `price_history.db` |
+| `price_db.py` | this repo | SQLite interface for `price_history.db` (schema, snapshots, queries) |
+| `trend_watcher.py` | this repo | Collector that writes poe.ninja snapshots into that database |
 
-The database is populated by an external `trend_watcher.py` process that scrapes poe.ninja periodically. Point it at a directory of your choosing.
+`price_db.py` creates `price_history.db` next to itself on first write; override
+the path with `POE_PRICE_DB`. Nothing is stored until you run the watcher:
 
-### Path of Building (PoB) Brain
+```
+python trend_watcher.py --league Covens              # all categories (~35 requests, ~1 min)
+python trend_watcher.py --league Covens --types Currency,Scarab
+python trend_watcher.py --league Covens --quiet      # JSON summary only
+```
 
-| Module | Location | Purpose |
-|--------|----------|---------|
-| `server.py` | separate repo | pob-brain MCP server — headless Path of Building with Lua eval, build loading, stat extraction |
+Schedule it (Task Scheduler / cron) if you want risers and fallers to mean
+something — trend analysis needs at least three snapshots per item.
+
+### Path of Building
+
+Path of Building integration is provided by the separate **`pob-mcp`** server,
+not by a module in this repo.
 
 ---
 
