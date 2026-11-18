@@ -9,6 +9,7 @@ Version: 1.0
 """
 import asyncio
 import json
+import os
 import sqlite3
 import sys
 from pathlib import Path
@@ -55,7 +56,7 @@ def _init():
     _last_sessid = sessid
     _api    = PoeApi(sessid, config["account"], config.get("character", ""),
                     config.get("contact_email", ""), config.get("client_id", ""))
-    _league = config.get("league", "Mirage")
+    _league = os.environ.get("POE_LEAGUE") or config.get("league", "Standard")
 
 
 def _unique_price(name: str) -> float:

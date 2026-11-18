@@ -74,8 +74,8 @@ def _user_agent(account: str = "", contact: str = "", client_id: str = "") -> st
     suffix = " (" + "; ".join(parts) + ")" if parts else ""
     return _header_safe("poe-trade-mcp/" + VERSION + suffix)
 
-# Default league — overridden by tool argument
-DEFAULT_LEAGUE = "Mirage"
+# Default league — overridden by tool argument, else POE_LEAGUE env, else Standard
+DEFAULT_LEAGUE = os.environ.get("POE_LEAGUE") or "Standard"
 
 # GGG trade API rate limiting — see legal_considerations.md TOS section.
 # Floor: 1.5s between requests. Dynamically widened from X-Rate-Limit response

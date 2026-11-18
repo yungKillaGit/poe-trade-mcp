@@ -166,6 +166,9 @@ def _scorer():
 
 # ── Frame type constants ────────────────────────────────────────────────────────
 
+# Default league — overridden by tool argument, else POE_LEAGUE env, else Standard
+DEFAULT_LEAGUE = os.environ.get("POE_LEAGUE") or "Standard"
+
 FRAME_RARE   = 2
 FRAME_MAGIC  = 1
 ALGO_FRAMES  = {FRAME_MAGIC, FRAME_RARE}
@@ -177,7 +180,7 @@ RARITY_MAP = {
 }
 
 
-def _price_single_api_item(item: dict, league: str = "Mirage") -> dict:
+def _price_single_api_item(item: dict, league: str = DEFAULT_LEAGUE) -> dict:
     """Price one PoE API item dict. Returns a result dict."""
     frame      = item.get("frameType", 0)
     name       = item.get("name", "").strip()
@@ -247,7 +250,7 @@ TOOLS = [
             "type": "object",
             "properties": {
                 "name":   {"type": "string", "description": "Item name to look up (partial match supported)."},
-                "league": {"type": "string", "description": "League name (default: Mirage)."},
+                "league": {"type": "string", "description": "League name (default: POE_LEAGUE / " + DEFAULT_LEAGUE + ")."},
             },
             "required": ["name"],
         },
@@ -266,7 +269,7 @@ TOOLS = [
             "properties": {
                 "item_dict": {"type": "object",  "description": "PoE API item dict."},
                 "item_text": {"type": "string",  "description": "Raw item text copied from PoE (Ctrl+C format)."},
-                "league":    {"type": "string",  "description": "League name (default: Mirage)."},
+                "league":    {"type": "string",  "description": "League name (default: POE_LEAGUE / " + DEFAULT_LEAGUE + ")."},
             },
         },
     ),
@@ -301,7 +304,7 @@ async def list_tools():
 @app.call_tool()
 async def call_tool(name: str, arguments: dict):
     try:
-        league = arguments.get("league", "Mirage")
+        league = arguments.get("league", DEFAULT_LEAGUE)
 
         if name == "ninja_lookup":
             query   = arguments["name"]

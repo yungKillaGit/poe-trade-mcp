@@ -41,10 +41,10 @@ def _detect_league(api: PoeApi, config: dict) -> str:
     if character:
         try:
             data = api.get_items(character)
-            return data.get("character", {}).get("league", "Mirage")
+            return data.get("character", {}).get("league", "Standard")
         except Exception:
             pass
-    return config.get("league", "Mirage")
+    return config.get("league", "Standard")
 
 
 def _init():

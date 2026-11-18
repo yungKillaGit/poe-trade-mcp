@@ -423,7 +423,7 @@ Provide one of `tab_name` or `tab_index`.
 
 | Argument | Type | Default | Description |
 |----------|------|---------|-------------|
-| `league` | string | "Mirage" | League name |
+| `league` | string | POE_LEAGUE (Covens) | League name |
 | `category` | string | -- | Item category (e.g., "weapon.wand", "armour.body", "accessory.ring") |
 | `rarity` | string | "any" | "nonunique", "unique", or "any" |
 | `name` | string | -- | Item name (for uniques) |
@@ -456,7 +456,7 @@ Provide one of `tab_name` or `tab_index`.
 | `mods` | array | -- | List of `{text, is_local?, min_pct?}` objects. `min_pct` defaults to 0.7 (70% of rolled value). |
 | `item_category` | string | -- | Trade category (e.g., "weapon.wand") |
 | `unique_name` | string | -- | For uniques: search by name instead of mods |
-| `league` | string | "Mirage" | League name |
+| `league` | string | POE_LEAGUE (Covens) | League name |
 | `limit` | integer | 10 | Max results |
 
 **Returns:** Same format as `search_trade`.
