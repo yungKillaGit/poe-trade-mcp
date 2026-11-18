@@ -71,7 +71,7 @@ TOOLS = [
             "Requires POE_CLIENT_ID env var (register a public client at "
             "pathofexile.com/developer — note GGG's docs say new application "
             "registration is currently closed). Also set redirect URI to "
-            "http://127.0.0.1:7878/callback.",
+            "http://127.0.0.1:7878/callback. "
             "Once authorized, stash tools automatically use OAuth for better reliability."
         ),
         inputSchema={
