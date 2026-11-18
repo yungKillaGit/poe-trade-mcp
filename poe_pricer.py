@@ -13,6 +13,7 @@ Version: 2.0
 """
 import importlib.util as _iutil
 import json
+import os
 import sys
 import time
 import urllib.request
@@ -34,7 +35,13 @@ app = Server("poe-pricer")
 
 NINJA_EXCHANGE_URL = "https://poe.ninja/poe1/api/economy/exchange/current/overview"
 NINJA_STASH_URL    = "https://poe.ninja/poe1/api/economy/stash/current/item/overview"
-_NINJA_HEADERS     = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+# Identify honestly instead of impersonating a browser. poe.ninja answers 200 to
+# this UA (verified), and pretending to be Chrome gains nothing while giving the
+# operator no way to contact us if the traffic ever becomes a problem.
+_NINJA_UA          = "poe-trade-mcp/1.0"
+if _contact := os.environ.get("POE_CONTACT_EMAIL", "").strip():
+    _NINJA_UA += f" (contact: {_contact})"
+_NINJA_HEADERS     = {"User-Agent": _NINJA_UA}
 _NINJA_TTL         = 900  # 15 minutes
 
 # Exchange endpoint types (bulk tradeable)
