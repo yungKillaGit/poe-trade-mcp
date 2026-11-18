@@ -32,26 +32,31 @@ HEADERS = {
 _CONTACT_WARNED = False
 
 
-def _user_agent(account: str = "", contact: str = "") -> str:
-    """Build the User-Agent that GGG's API policy expects.
+def _user_agent(account: str = "", contact: str = "", client_id: str = "") -> str:
+    """Build the User-Agent mandated by GGG's developer guidelines.
 
-    Policy requires an identifiable client and a real contact address so GGG
-    can reach a human before throttling or blocking. A placeholder contact
-    (historically `contact: buildtool@localhost`) counts as no contact at all.
+    Documented format (developer/docs → Developer Guidelines → User Agent):
+        User-Agent: OAuth {$clientId}/{$version} (contact: {$contact}) ...
+
+    Without a registered client we fall back to an honest, identifiable string —
+    the `OAuth` prefix is only correct when there really is a client_id.
     """
     global _CONTACT_WARNED
-    parts = []
-    if account:
-        parts.append("account: " + account)
-    if contact:
-        parts.append("contact: " + contact)
-    elif not _CONTACT_WARNED:
+    if not contact and not _CONTACT_WARNED:
         _CONTACT_WARNED = True
         print(
             "[poe-trade] WARNING: POE_CONTACT_EMAIL is not set. GGG's API policy "
             "requires a real contact address in the User-Agent — add it to .mcp.json.",
             file=sys.stderr,
         )
+    if client_id:
+        return "OAuth " + client_id + "/" + VERSION + " (contact: " + (contact or "unset") + ")"
+
+    parts = []
+    if account:
+        parts.append("account: " + account)
+    if contact:
+        parts.append("contact: " + contact)
     suffix = " (" + "; ".join(parts) + ")" if parts else ""
     return "poe-trade-mcp/" + VERSION + suffix
 
@@ -151,9 +156,10 @@ def _load_headers() -> dict:
     sessid = os.environ.get("POE_SESSION_ID") or cfg.get("poesessid", "")
     account = os.environ.get("POE_ACCOUNT_NAME") or cfg.get("account", "")
     contact = os.environ.get("POE_CONTACT_EMAIL") or cfg.get("contact_email", "")
+    client_id = os.environ.get("POE_CLIENT_ID") or cfg.get("client_id", "")
 
     h = dict(HEADERS)
-    h["User-Agent"] = _user_agent(account, contact)
+    h["User-Agent"] = _user_agent(account, contact, client_id)
     if sessid:
         h["Cookie"] = "POESESSID=" + sessid
     return h

@@ -93,8 +93,16 @@ class PoeApi:
         self.account = account  # kept with discriminator; urlencode encodes # as %23
         self.character = character
         self.client_id = client_id
-        contact = f"; contact: {contact_email}" if contact_email else ""
-        self.user_agent = f"poe-trade-mcp/1.0 (account: {self.account}{contact})"
+        # GGG's documented User-Agent format is "OAuth {$clientId}/{version}
+        # (contact: {$contact})" — use it whenever a registered client exists,
+        # otherwise fall back to an honest identifying string.
+        if self.client_id:
+            self.user_agent = (
+                f"OAuth {self.client_id}/1.0 (contact: {contact_email or 'unset'})"
+            )
+        else:
+            contact = f"; contact: {contact_email}" if contact_email else ""
+            self.user_agent = f"poe-trade-mcp/1.0 (account: {self.account}{contact})"
         if not contact_email:
             print(
                 "[poe-trade] WARNING: POE_CONTACT_EMAIL is not set. GGG's API policy "
